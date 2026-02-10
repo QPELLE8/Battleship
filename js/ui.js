@@ -7,6 +7,11 @@ const UI = (() => {
     const pRows = document.getElementById('player-row-labels');
     const eRows = document.getElementById('enemy-row-labels');
 
+    pCols.innerHTML = '';
+    eCols.innerHTML = '';
+    pRows.innerHTML = '';
+    eRows.innerHTML = '';
+
     COL_LETTERS.forEach(letter => {
       const s1 = document.createElement('span');
       s1.textContent = letter;
