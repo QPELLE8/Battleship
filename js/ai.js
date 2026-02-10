@@ -89,6 +89,10 @@ const AI = (() => {
         }
       });
     } else if (result.result === 'sunk') {
+      if (result.markedCells) {
+        result.markedCells.forEach(mc => triedCells.add(key(mc.r, mc.c)));
+      }
+
       hitStack = hitStack.filter(h => {
         const ship = shipTracker.find(s => s.name === result.shipName);
         return !ship.cells.some(c => c.r === h.r && c.c === h.c);

@@ -32,13 +32,41 @@ function createShipTracker() {
   }));
 }
 
+function getNeighbors(r, c) {
+  const neighbors = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+        neighbors.push({ r: nr, c: nc });
+      }
+    }
+  }
+  return neighbors;
+}
+
 function canPlaceShip(board, row, col, size, horizontal) {
+  const shipCells = [];
   for (let i = 0; i < size; i++) {
     const r = horizontal ? row : row + i;
     const c = horizontal ? col + i : col;
     if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE) return false;
     if (board[r][c] !== CELL_EMPTY) return false;
+    shipCells.push({ r, c });
   }
+
+  for (const cell of shipCells) {
+    const neighbors = getNeighbors(cell.r, cell.c);
+    for (const n of neighbors) {
+      if (board[n.r][n.c] === CELL_SHIP) {
+        const isPartOfSameShip = shipCells.some(sc => sc.r === n.r && sc.c === n.c);
+        if (!isPartOfSameShip) return false;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -64,6 +92,20 @@ function removeShip(board, shipTracker, shipIndex) {
   ship.cells = [];
 }
 
+function markSurroundingCells(board, ship) {
+  const marked = [];
+  for (const cell of ship.cells) {
+    const neighbors = getNeighbors(cell.r, cell.c);
+    for (const n of neighbors) {
+      if (board[n.r][n.c] === CELL_EMPTY || board[n.r][n.c] === CELL_SHIP) {
+        board[n.r][n.c] = CELL_MISS;
+        marked.push({ r: n.r, c: n.c });
+      }
+    }
+  }
+  return marked;
+}
+
 function fireAt(board, shipTracker, row, col) {
   if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
     return { valid: false };
@@ -84,7 +126,8 @@ function fireAt(board, shipTracker, row, col) {
         ship.cells.forEach(({ r, c }) => {
           board[r][c] = CELL_SUNK;
         });
-        return { valid: true, result: 'sunk', shipName: ship.name };
+        const markedCells = markSurroundingCells(board, ship);
+        return { valid: true, result: 'sunk', shipName: ship.name, sunkCells: ship.cells.slice(), markedCells };
       }
     }
     return { valid: true, result: 'hit' };

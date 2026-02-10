@@ -148,6 +148,25 @@ const UI = (() => {
     setTimeout(() => cell.classList.remove(type + '-anim'), 400);
   }
 
+  function playExplosion(containerId, sunkCells) {
+    return new Promise(resolve => {
+      sunkCells.forEach((pos, i) => {
+        const cell = getCell(containerId, pos.r, pos.c);
+        setTimeout(() => {
+          cell.classList.add('exploding');
+          const burst = document.createElement('div');
+          burst.className = 'explosion-burst';
+          cell.appendChild(burst);
+          setTimeout(() => {
+            burst.remove();
+            cell.classList.remove('exploding');
+          }, 600);
+        }, i * 120);
+      });
+      setTimeout(resolve, sunkCells.length * 120 + 600);
+    });
+  }
+
   function showGameOver(title, msg) {
     document.getElementById('game-over-title').textContent = title;
     document.getElementById('game-over-msg').textContent = msg;
@@ -179,6 +198,7 @@ const UI = (() => {
     clearPreview,
     setCellClickable,
     animateCell,
+    playExplosion,
     showGameOver,
     hideGameOver,
     showDock,

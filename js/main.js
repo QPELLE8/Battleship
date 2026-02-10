@@ -121,12 +121,29 @@
     if (result.result === 'hit') {
       Sound.hit();
       UI.setMessage('DIRECT HIT!');
+      setTimeout(aiTurn, 800);
     } else if (result.result === 'sunk') {
       Sound.sunk();
       UI.setMessage(`YOU SUNK THEIR ${result.shipName.toUpperCase()}!`);
+      UI.playExplosion('enemy-board', result.sunkCells).then(() => {
+        UI.renderBoard('enemy-board', enemyBoard, false);
+        UI.updateScores(playerShips, enemyShips);
+        if (allShipsSunk(enemyShips)) {
+          phase = 'over';
+          UI.setCellClickable('enemy-board', false);
+          Sound.victory();
+          setTimeout(() => {
+            UI.showGameOver('VICTORY!', 'ALL ENEMY SHIPS DESTROYED. YOU WIN, COMMANDER!');
+          }, 600);
+          return;
+        }
+        setTimeout(aiTurn, 800);
+      });
+      return;
     } else {
       Sound.miss();
       UI.setMessage('MISS...');
+      setTimeout(aiTurn, 800);
     }
 
     if (allShipsSunk(enemyShips)) {
@@ -138,8 +155,6 @@
       }, 600);
       return;
     }
-
-    setTimeout(aiTurn, 800);
   }
 
   function aiTurn() {
@@ -153,12 +168,29 @@
     if (result.result === 'hit') {
       Sound.hit();
       UI.setMessage('ENEMY HIT YOUR SHIP!');
+      playerTurn = true;
     } else if (result.result === 'sunk') {
       Sound.sunk();
       UI.setMessage(`ENEMY SUNK YOUR ${result.shipName.toUpperCase()}!`);
+      UI.playExplosion('player-board', result.sunkCells).then(() => {
+        UI.renderBoard('player-board', playerBoard, true);
+        UI.updateScores(playerShips, enemyShips);
+        if (allShipsSunk(playerShips)) {
+          phase = 'over';
+          UI.setCellClickable('enemy-board', false);
+          Sound.defeat();
+          setTimeout(() => {
+            UI.showGameOver('DEFEAT', 'YOUR FLEET HAS BEEN DESTROYED. GAME OVER.');
+          }, 600);
+          return;
+        }
+        playerTurn = true;
+      });
+      return;
     } else {
       Sound.miss();
       UI.setMessage('ENEMY MISSED. YOUR TURN, COMMANDER.');
+      playerTurn = true;
     }
 
     if (allShipsSunk(playerShips)) {
@@ -170,8 +202,6 @@
       }, 600);
       return;
     }
-
-    playerTurn = true;
   }
 
   function handleRotate() {
