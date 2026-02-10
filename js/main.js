@@ -26,7 +26,7 @@
     UI.buildBoard('enemy-board', onEnemyBoardClick, null, null);
     UI.buildShipDock(SHIPS, onDockSelect);
     UI.showDock();
-    UI.renderBoard('player-board', playerBoard, true);
+    UI.renderBoard('player-board', playerBoard, true, playerShips);
     UI.renderBoard('enemy-board', enemyBoard, false);
     UI.setCellClickable('player-board', true);
     UI.setCellClickable('enemy-board', false);
@@ -42,7 +42,7 @@
     if (placedFlags[index]) {
       removeShip(playerBoard, playerShips, index);
       placedFlags[index] = false;
-      UI.renderBoard('player-board', playerBoard, true);
+      UI.renderBoard('player-board', playerBoard, true, playerShips);
     }
     selectedShipIndex = index;
     updateDockDisplay();
@@ -83,11 +83,11 @@
     Sound.place();
     placedFlags[selectedShipIndex] = true;
     UI.clearPreview('player-board');
-    UI.renderBoard('player-board', playerBoard, true);
+    UI.renderBoard('player-board', playerBoard, true, playerShips);
     updateDockDisplay();
     updateStartButton();
 
-    const nextUnplaced = placedFlags.findIndex(f => !f);
+    const nextUnplaced= placedFlags.findIndex(f => !f);
     if (nextUnplaced !== -1) {
       selectedShipIndex = nextUnplaced;
       updateDockDisplay();
@@ -126,7 +126,7 @@
       Sound.sunk();
       UI.setMessage(`YOU SUNK THEIR ${result.shipName.toUpperCase()}!`);
       UI.playExplosion('enemy-board', result.sunkCells).then(() => {
-        UI.renderBoard('enemy-board', enemyBoard, false);
+        UI.renderBoard('enemy-board', enemyBoard, false, null);
         UI.updateScores(playerShips, enemyShips);
         if (allShipsSunk(enemyShips)) {
           phase = 'over';
@@ -161,7 +161,7 @@
     const result = AI.takeTurn(playerBoard, playerShips);
     if (!result) return;
 
-    UI.renderBoard('player-board', playerBoard, true);
+    UI.renderBoard('player-board', playerBoard, true, playerShips);
     UI.animateCell('player-board', result.row, result.col, result.result === 'miss' ? 'miss' : 'hit');
     UI.updateScores(playerShips, enemyShips);
 
@@ -173,7 +173,7 @@
       Sound.sunk();
       UI.setMessage(`ENEMY SUNK YOUR ${result.shipName.toUpperCase()}!`);
       UI.playExplosion('player-board', result.sunkCells).then(() => {
-        UI.renderBoard('player-board', playerBoard, true);
+        UI.renderBoard('player-board', playerBoard, true, playerShips);
         UI.updateScores(playerShips, enemyShips);
         if (allShipsSunk(playerShips)) {
           phase = 'over';
@@ -224,7 +224,7 @@
     randomPlacement(playerBoard, playerShips);
     placedFlags = new Array(SHIPS.length).fill(true);
     Sound.place();
-    UI.renderBoard('player-board', playerBoard, true);
+    UI.renderBoard('player-board', playerBoard, true, playerShips);
     updateDockDisplay();
     updateStartButton();
     UI.setMessage('RANDOM DEPLOYMENT COMPLETE. PRESS START BATTLE!');
@@ -239,7 +239,7 @@
       }
     });
     selectedShipIndex = 0;
-    UI.renderBoard('player-board', playerBoard, true);
+    UI.renderBoard('player-board', playerBoard, true, playerShips);
     updateDockDisplay();
     updateStartButton();
     UI.setMessage('BOARD CLEARED. PLACE YOUR FLEET, COMMANDER.');

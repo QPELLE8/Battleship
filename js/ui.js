@@ -59,14 +59,45 @@ const UI = (() => {
     return container.children[r * BOARD_SIZE + c];
   }
 
-  function renderBoard(containerId, board, showShips) {
+  function buildShipMap(ships) {
+    const map = {};
+    ships.forEach(ship => {
+      if (ship.cells.length === 0) return;
+      ship.cells.forEach((pos, idx) => {
+        const key = pos.r + ',' + pos.c;
+        let segment = 'body';
+        if (idx === 0) segment = 'bow';
+        else if (idx === ship.cells.length - 1) segment = 'stern';
+        map[key] = {
+          segment,
+          orient: ship.horizontal ? 'h' : 'v',
+          shipName: ship.name,
+        };
+      });
+    });
+    return map;
+  }
+
+  function renderBoard(containerId, board, showShips, ships) {
+    const shipMap = (showShips && ships) ? buildShipMap(ships) : {};
     for (let r = 0; r < BOARD_SIZE; r++) {
       for (let c = 0; c < BOARD_SIZE; c++) {
         const cell = getCell(containerId, r, c);
         cell.className = 'cell';
+        const inner = cell.querySelector('.ship-inner');
+        if (inner) inner.remove();
         switch (board[r][c]) {
           case CELL_SHIP:
-            if (showShips) cell.classList.add('ship');
+            if (showShips) {
+              cell.classList.add('ship');
+              const info = shipMap[r + ',' + c];
+              if (info) {
+                cell.classList.add('ship-' + info.segment + '-' + info.orient);
+                const el = document.createElement('div');
+                el.className = 'ship-inner ship-inner-' + info.segment + '-' + info.orient;
+                cell.appendChild(el);
+              }
+            }
             break;
           case CELL_HIT:
             cell.classList.add('hit');

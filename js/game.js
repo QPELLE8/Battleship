@@ -29,6 +29,7 @@ function createShipTracker() {
     cells: [],
     hits: 0,
     sunk: false,
+    horizontal: true,
   }));
 }
 
@@ -75,6 +76,7 @@ function placeShip(board, shipTracker, shipIndex, row, col, horizontal) {
   if (!canPlaceShip(board, row, col, ship.size, horizontal)) return false;
 
   ship.cells = [];
+  ship.horizontal = horizontal;
   for (let i = 0; i < ship.size; i++) {
     const r = horizontal ? row : row + i;
     const c = horizontal ? col + i : col;
