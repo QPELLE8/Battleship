@@ -119,7 +119,7 @@ const AI = (() => {
       }
     }
 
-    return { row: target.r, col: target.c, result: result.result, shipName: result.shipName };
+    return { row: target.r, col: target.c, result: result.result, shipName: result.shipName, sunkCells: result.sunkCells, markedCells: result.markedCells };
   }
 
   return { reset, takeTurn };
