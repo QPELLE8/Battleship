@@ -28,49 +28,101 @@ const AI = (() => {
     ].filter(cell => inBounds(cell.r, cell.c));
   }
 
-  function detectDirection(hits) {
-    if (hits.length < 2) return null;
-    const allSameRow = hits.every(h => h.r === hits[0].r);
-    if (allSameRow) return 'horizontal';
-    const allSameCol = hits.every(h => h.c === hits[0].c);
-    if (allSameCol) return 'vertical';
-    return null;
+  function isUntried(r, c, board) {
+    if (!inBounds(r, c)) return false;
+    if (triedCells.has(key(r, c))) return false;
+    const state = board[r][c];
+    return state !== CELL_HIT && state !== CELL_MISS && state !== CELL_SUNK;
   }
 
-  function buildDirectionalTargets(hits, direction) {
-    const targets = [];
-    if (direction === 'horizontal') {
-      const row = hits[0].r;
-      const cols = hits.map(h => h.c).sort((a, b) => a - b);
-      const minCol = cols[0] - 1;
-      const maxCol = cols[cols.length - 1] + 1;
-      if (inBounds(row, minCol)) targets.push({ r: row, c: minCol });
-      if (inBounds(row, maxCol)) targets.push({ r: row, c: maxCol });
-    } else if (direction === 'vertical') {
-      const col = hits[0].c;
-      const rows = hits.map(h => h.r).sort((a, b) => a - b);
-      const minRow = rows[0] - 1;
-      const maxRow = rows[rows.length - 1] + 1;
-      if (inBounds(minRow, col)) targets.push({ r: minRow, c: col });
-      if (inBounds(maxRow, col)) targets.push({ r: maxRow, c: col });
+  function findBestContiguousLine(hits) {
+    if (hits.length < 2) return null;
+
+    let bestLine = null;
+    let bestLen = 1;
+
+    const byCol = {};
+    hits.forEach(h => {
+      if (!byCol[h.c]) byCol[h.c] = [];
+      byCol[h.c].push(h.r);
+    });
+
+    for (const col in byCol) {
+      const rows = byCol[col].sort((a, b) => a - b);
+      let start = 0;
+      for (let i = 1; i <= rows.length; i++) {
+        if (i === rows.length || rows[i] !== rows[i - 1] + 1) {
+          const len = i - start;
+          if (len > bestLen) {
+            bestLen = len;
+            bestLine = {
+              direction: 'vertical',
+              cells: rows.slice(start, i).map(r => ({ r, c: parseInt(col) })),
+            };
+          }
+          start = i;
+        }
+      }
     }
-    return targets.filter(t => !triedCells.has(key(t.r, t.c)));
+
+    const byRow = {};
+    hits.forEach(h => {
+      if (!byRow[h.r]) byRow[h.r] = [];
+      byRow[h.r].push(h.c);
+    });
+
+    for (const row in byRow) {
+      const cols = byRow[row].sort((a, b) => a - b);
+      let start = 0;
+      for (let i = 1; i <= cols.length; i++) {
+        if (i === cols.length || cols[i] !== cols[i - 1] + 1) {
+          const len = i - start;
+          if (len > bestLen) {
+            bestLen = len;
+            bestLine = {
+              direction: 'horizontal',
+              cells: cols.slice(start, i).map(c => ({ r: parseInt(row), c })),
+            };
+          }
+          start = i;
+        }
+      }
+    }
+
+    return bestLine;
   }
 
   function rebuildTargetQueue(board) {
     targetQueue = [];
-    const direction = detectDirection(hitStack);
-    if (direction) {
-      targetQueue = buildDirectionalTargets(hitStack, direction);
-    } else {
+
+    const line = findBestContiguousLine(hitStack);
+
+    if (line) {
+      if (line.direction === 'vertical') {
+        const col = line.cells[0].c;
+        const rows = line.cells.map(c => c.r).sort((a, b) => a - b);
+        const above = { r: rows[0] - 1, c: col };
+        const below = { r: rows[rows.length - 1] + 1, c: col };
+        if (isUntried(above.r, above.c, board)) targetQueue.push(above);
+        if (isUntried(below.r, below.c, board)) targetQueue.push(below);
+      } else {
+        const row = line.cells[0].r;
+        const cols = line.cells.map(c => c.c).sort((a, b) => a - b);
+        const left = { r: row, c: cols[0] - 1 };
+        const right = { r: row, c: cols[cols.length - 1] + 1 };
+        if (isUntried(left.r, left.c, board)) targetQueue.push(left);
+        if (isUntried(right.r, right.c, board)) targetQueue.push(right);
+      }
+    }
+
+    if (targetQueue.length === 0 && hitStack.length > 0) {
+      const seen = new Set();
       hitStack.forEach(h => {
-        const adj = getAdjacentCells(h.r, h.c);
-        adj.forEach(a => {
-          if (!triedCells.has(key(a.r, a.c))) {
-            const cellState = board[a.r][a.c];
-            if (cellState !== CELL_HIT && cellState !== CELL_MISS && cellState !== CELL_SUNK) {
-              targetQueue.push(a);
-            }
+        getAdjacentCells(h.r, h.c).forEach(a => {
+          const k = key(a.r, a.c);
+          if (!seen.has(k) && isUntried(a.r, a.c, board)) {
+            seen.add(k);
+            targetQueue.push(a);
           }
         });
       });
@@ -80,10 +132,16 @@ const AI = (() => {
   function chooseTarget(board) {
     while (targetQueue.length > 0) {
       const target = targetQueue.shift();
-      const k = key(target.r, target.c);
-      if (!triedCells.has(k) && inBounds(target.r, target.c)) {
-        const cellState = board[target.r][target.c];
-        if (cellState !== CELL_HIT && cellState !== CELL_MISS && cellState !== CELL_SUNK) {
+      if (isUntried(target.r, target.c, board)) {
+        return target;
+      }
+    }
+
+    if (hitStack.length > 0) {
+      rebuildTargetQueue(board);
+      while (targetQueue.length > 0) {
+        const target = targetQueue.shift();
+        if (isUntried(target.r, target.c, board)) {
           return target;
         }
       }
@@ -93,12 +151,9 @@ const AI = (() => {
     const candidates = [];
     for (let r = 0; r < BOARD_SIZE; r++) {
       for (let c = 0; c < BOARD_SIZE; c++) {
-        if (!triedCells.has(key(r, c))) {
-          const cellState = board[r][c];
-          if (cellState !== CELL_HIT && cellState !== CELL_MISS && cellState !== CELL_SUNK) {
-            if ((r + c) % 2 === 0) {
-              candidates.push({ r, c });
-            }
+        if (isUntried(r, c, board)) {
+          if ((r + c) % 2 === 0) {
+            candidates.push({ r, c });
           }
         }
       }
@@ -107,11 +162,8 @@ const AI = (() => {
     if (candidates.length === 0) {
       for (let r = 0; r < BOARD_SIZE; r++) {
         for (let c = 0; c < BOARD_SIZE; c++) {
-          if (!triedCells.has(key(r, c))) {
-            const cellState = board[r][c];
-            if (cellState !== CELL_HIT && cellState !== CELL_MISS && cellState !== CELL_SUNK) {
-              candidates.push({ r, c });
-            }
+          if (isUntried(r, c, board)) {
+            candidates.push({ r, c });
           }
         }
       }
@@ -149,7 +201,7 @@ const AI = (() => {
         mode = 'hunt';
         targetQueue = [];
       }
-    } else if (result.result === 'miss' && mode === 'target') {
+    } else if (hitStack.length > 0) {
       rebuildTargetQueue(board);
     }
 
