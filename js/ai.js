@@ -28,6 +28,55 @@ const AI = (() => {
     ].filter(cell => inBounds(cell.r, cell.c));
   }
 
+  function detectDirection(hits) {
+    if (hits.length < 2) return null;
+    const allSameRow = hits.every(h => h.r === hits[0].r);
+    if (allSameRow) return 'horizontal';
+    const allSameCol = hits.every(h => h.c === hits[0].c);
+    if (allSameCol) return 'vertical';
+    return null;
+  }
+
+  function buildDirectionalTargets(hits, direction) {
+    const targets = [];
+    if (direction === 'horizontal') {
+      const row = hits[0].r;
+      const cols = hits.map(h => h.c).sort((a, b) => a - b);
+      const minCol = cols[0] - 1;
+      const maxCol = cols[cols.length - 1] + 1;
+      if (inBounds(row, minCol)) targets.push({ r: row, c: minCol });
+      if (inBounds(row, maxCol)) targets.push({ r: row, c: maxCol });
+    } else if (direction === 'vertical') {
+      const col = hits[0].c;
+      const rows = hits.map(h => h.r).sort((a, b) => a - b);
+      const minRow = rows[0] - 1;
+      const maxRow = rows[rows.length - 1] + 1;
+      if (inBounds(minRow, col)) targets.push({ r: minRow, c: col });
+      if (inBounds(maxRow, col)) targets.push({ r: maxRow, c: col });
+    }
+    return targets.filter(t => !triedCells.has(key(t.r, t.c)));
+  }
+
+  function rebuildTargetQueue(board) {
+    targetQueue = [];
+    const direction = detectDirection(hitStack);
+    if (direction) {
+      targetQueue = buildDirectionalTargets(hitStack, direction);
+    } else {
+      hitStack.forEach(h => {
+        const adj = getAdjacentCells(h.r, h.c);
+        adj.forEach(a => {
+          if (!triedCells.has(key(a.r, a.c))) {
+            const cellState = board[a.r][a.c];
+            if (cellState !== CELL_HIT && cellState !== CELL_MISS && cellState !== CELL_SUNK) {
+              targetQueue.push(a);
+            }
+          }
+        });
+      });
+    }
+  }
+
   function chooseTarget(board) {
     while (targetQueue.length > 0) {
       const target = targetQueue.shift();
@@ -82,12 +131,7 @@ const AI = (() => {
     if (result.result === 'hit') {
       mode = 'target';
       hitStack.push(target);
-      const adj = getAdjacentCells(target.r, target.c);
-      adj.forEach(a => {
-        if (!triedCells.has(key(a.r, a.c))) {
-          targetQueue.push(a);
-        }
-      });
+      rebuildTargetQueue(board);
     } else if (result.result === 'sunk') {
       if (result.markedCells) {
         result.markedCells.forEach(mc => triedCells.add(key(mc.r, mc.c)));
@@ -98,25 +142,15 @@ const AI = (() => {
         return !ship.cells.some(c => c.r === h.r && c.c === h.c);
       });
 
-      targetQueue = targetQueue.filter(t => {
-        return !triedCells.has(key(t.r, t.c));
-      });
-
       if (hitStack.length > 0) {
         mode = 'target';
-        targetQueue = [];
-        hitStack.forEach(h => {
-          const adj = getAdjacentCells(h.r, h.c);
-          adj.forEach(a => {
-            if (!triedCells.has(key(a.r, a.c))) {
-              targetQueue.push(a);
-            }
-          });
-        });
+        rebuildTargetQueue(board);
       } else {
         mode = 'hunt';
         targetQueue = [];
       }
+    } else if (result.result === 'miss' && mode === 'target') {
+      rebuildTargetQueue(board);
     }
 
     return { row: target.r, col: target.c, result: result.result, shipName: result.shipName, sunkCells: result.sunkCells, markedCells: result.markedCells };
