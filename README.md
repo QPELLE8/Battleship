@@ -4,7 +4,7 @@ An 80's theme Battleship game simulation against an AI, built with vanilla HTML/
 
 ## How to Play
 
-1. Open `[index.html](https://battleship-lint-app-yjkea73y.devinapps.com/)` in any modern browser
+1. Open `https://battleship-lint-app-yjkea73y.devinapps.com` in any modern browser
 2. **Place your ships** on the grid by clicking cells (press **R** to rotate, or use the buttons)
 3. Click **START BATTLE** to begin
 4. **Click enemy grid cells** to fire shots — hit all enemy ships to win!
