@@ -35,33 +35,20 @@ const AI = (() => {
     return state !== CELL_HIT && state !== CELL_MISS && state !== CELL_SUNK;
   }
 
-  function findBestContiguousLine(hits) {
+  function detectAxis(hits) {
     if (hits.length < 2) return null;
-
-    let bestLine = null;
-    let bestLen = 1;
 
     const byCol = {};
     hits.forEach(h => {
       if (!byCol[h.c]) byCol[h.c] = [];
       byCol[h.c].push(h.r);
     });
-
+    let bestCol = null;
+    let bestColCount = 0;
     for (const col in byCol) {
-      const rows = byCol[col].sort((a, b) => a - b);
-      let start = 0;
-      for (let i = 1; i <= rows.length; i++) {
-        if (i === rows.length || rows[i] !== rows[i - 1] + 1) {
-          const len = i - start;
-          if (len > bestLen) {
-            bestLen = len;
-            bestLine = {
-              direction: 'vertical',
-              cells: rows.slice(start, i).map(r => ({ r, c: parseInt(col) })),
-            };
-          }
-          start = i;
-        }
+      if (byCol[col].length > bestColCount) {
+        bestColCount = byCol[col].length;
+        bestCol = parseInt(col);
       }
     }
 
@@ -70,52 +57,101 @@ const AI = (() => {
       if (!byRow[h.r]) byRow[h.r] = [];
       byRow[h.r].push(h.c);
     });
-
+    let bestRow = null;
+    let bestRowCount = 0;
     for (const row in byRow) {
-      const cols = byRow[row].sort((a, b) => a - b);
-      let start = 0;
-      for (let i = 1; i <= cols.length; i++) {
-        if (i === cols.length || cols[i] !== cols[i - 1] + 1) {
-          const len = i - start;
-          if (len > bestLen) {
-            bestLen = len;
-            bestLine = {
-              direction: 'horizontal',
-              cells: cols.slice(start, i).map(c => ({ r: parseInt(row), c })),
-            };
-          }
-          start = i;
-        }
+      if (byRow[row].length > bestRowCount) {
+        bestRowCount = byRow[row].length;
+        bestRow = parseInt(row);
       }
     }
 
-    return bestLine;
+    if (bestColCount >= 2 && bestColCount >= bestRowCount) {
+      return {
+        direction: 'vertical',
+        col: bestCol,
+        rows: byCol[bestCol].sort((a, b) => a - b),
+      };
+    }
+    if (bestRowCount >= 2) {
+      return {
+        direction: 'horizontal',
+        row: bestRow,
+        cols: byRow[bestRow].sort((a, b) => a - b),
+      };
+    }
+    return null;
   }
 
   function rebuildTargetQueue(board) {
     targetQueue = [];
 
-    const line = findBestContiguousLine(hitStack);
+    const axis = detectAxis(hitStack);
 
-    if (line) {
-      if (line.direction === 'vertical') {
-        const col = line.cells[0].c;
-        const rows = line.cells.map(c => c.r).sort((a, b) => a - b);
-        const above = { r: rows[0] - 1, c: col };
-        const below = { r: rows[rows.length - 1] + 1, c: col };
-        if (isUntried(above.r, above.c, board)) targetQueue.push(above);
-        if (isUntried(below.r, below.c, board)) targetQueue.push(below);
+    if (axis) {
+      if (axis.direction === 'vertical') {
+        const col = axis.col;
+        const minRow = axis.rows[0];
+        const maxRow = axis.rows[axis.rows.length - 1];
+
+        for (let r = minRow - 1; r >= 0; r--) {
+          if (isUntried(r, col, board)) { targetQueue.push({ r, c: col }); break; }
+          const st = board[r][col];
+          if (st === CELL_MISS || st === CELL_SUNK) break;
+        }
+        for (let r = maxRow + 1; r < BOARD_SIZE; r++) {
+          if (isUntried(r, col, board)) { targetQueue.push({ r, c: col }); break; }
+          const st = board[r][col];
+          if (st === CELL_MISS || st === CELL_SUNK) break;
+        }
+        for (let r = minRow + 1; r < maxRow; r++) {
+          if (isUntried(r, col, board)) targetQueue.push({ r, c: col });
+        }
       } else {
-        const row = line.cells[0].r;
-        const cols = line.cells.map(c => c.c).sort((a, b) => a - b);
-        const left = { r: row, c: cols[0] - 1 };
-        const right = { r: row, c: cols[cols.length - 1] + 1 };
-        if (isUntried(left.r, left.c, board)) targetQueue.push(left);
-        if (isUntried(right.r, right.c, board)) targetQueue.push(right);
+        const row = axis.row;
+        const minCol = axis.cols[0];
+        const maxCol = axis.cols[axis.cols.length - 1];
+
+        for (let c = minCol - 1; c >= 0; c--) {
+          if (isUntried(row, c, board)) { targetQueue.push({ r: row, c }); break; }
+          const st = board[row][c];
+          if (st === CELL_MISS || st === CELL_SUNK) break;
+        }
+        for (let c = maxCol + 1; c < BOARD_SIZE; c++) {
+          if (isUntried(row, c, board)) { targetQueue.push({ r: row, c }); break; }
+          const st = board[row][c];
+          if (st === CELL_MISS || st === CELL_SUNK) break;
+        }
+        for (let c = minCol + 1; c < maxCol; c++) {
+          if (isUntried(row, c, board)) targetQueue.push({ r: row, c });
+        }
       }
+
+      if (targetQueue.length === 0) {
+        const axisKeys = new Set();
+        if (axis.direction === 'vertical') {
+          axis.rows.forEach(r => axisKeys.add(key(r, axis.col)));
+        } else {
+          axis.cols.forEach(c => axisKeys.add(key(axis.row, c)));
+        }
+        const otherHits = hitStack.filter(h => !axisKeys.has(key(h.r, h.c)));
+        if (otherHits.length > 0) {
+          const seen = new Set();
+          otherHits.forEach(h => {
+            getAdjacentCells(h.r, h.c).forEach(a => {
+              const k = key(a.r, a.c);
+              if (!seen.has(k) && isUntried(a.r, a.c, board)) {
+                seen.add(k);
+                targetQueue.push(a);
+              }
+            });
+          });
+        }
+      }
+      return;
     }
 
-    if (targetQueue.length === 0 && hitStack.length > 0) {
+    if (hitStack.length > 0) {
       const seen = new Set();
       hitStack.forEach(h => {
         getAdjacentCells(h.r, h.c).forEach(a => {
