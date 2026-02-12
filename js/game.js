@@ -58,16 +58,6 @@ function canPlaceShip(board, row, col, size, horizontal) {
     shipCells.push({ r, c });
   }
 
-  for (const cell of shipCells) {
-    const neighbors = getNeighbors(cell.r, cell.c);
-    for (const n of neighbors) {
-      if (board[n.r][n.c] === CELL_SHIP) {
-        const isPartOfSameShip = shipCells.some(sc => sc.r === n.r && sc.c === n.c);
-        if (!isPartOfSameShip) return false;
-      }
-    }
-  }
-
   return true;
 }
 
@@ -99,7 +89,7 @@ function markSurroundingCells(board, ship) {
   for (const cell of ship.cells) {
     const neighbors = getNeighbors(cell.r, cell.c);
     for (const n of neighbors) {
-      if (board[n.r][n.c] === CELL_EMPTY || board[n.r][n.c] === CELL_SHIP) {
+      if (board[n.r][n.c] === CELL_EMPTY) {
         board[n.r][n.c] = CELL_MISS;
         marked.push({ r: n.r, c: n.c });
       }
